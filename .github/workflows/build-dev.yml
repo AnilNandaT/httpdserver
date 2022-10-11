@@ -1,0 +1,15 @@
+name: build dev
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build:
+    name: build for dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: build dev
+        run: |
+          echo "building dev"

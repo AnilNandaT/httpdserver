@@ -1,0 +1,99 @@
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+name: Build Docker image
+
+on:
+  release:
+    types: [published]
+    
+  workflow_dispatch:
+    inputs:
+      releaseType:
+        description: 'where to release'
+        required: true
+        default: uat
+
+
+jobs:
+  build:
+    name: Build Image
+    environment:
+      name: uat
+
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.build-image.outputs.image }}
+
+    steps:
+      # - name: Maximize build space
+      #   uses: easimon/maximize-build-space@master
+      #   with:
+      #     root-reserve-mb: 46080
+      #     swap-size-mb: 1024
+      #     remove-dotnet: 'true'
+      #     remove-android: 'true'
+      #     remove-haskell: 'true'
+
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # - name: Run sonar scan
+      #   uses: sonarsource/sonarqube-scan-action@master
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      # # If you wish to fail your job when the Quality Gate is red, uncomment the
+      # # following lines. This would typically be used to fail a deployment.
+      # - name: Sonar quality gate action
+      #   uses: sonarsource/sonarqube-quality-gate-action@master
+      #   timeout-minutes: 5
+      #   env:
+      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Set up Dev environment
+        if: endsWith(github.ref, '/dev')
+        run: |
+          echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+          echo "ECR_REPOSITORY=prepaire-dev-drug-interaction" >> $GITHUB_ENV
+          echo "ECS_SERVICE=drug-interaction" >> $GITHUB_ENV
+          echo "ECS_CLUSTER=prepaire-dev-ecs" >> $GITHUB_ENV
+          echo "ECS_TASK_DEFINITION=.aws/dev-drug-interaction-task-definition.json" >> $GITHUB_ENV
+          echo "CONTAINER_NAME=drug-interaction" >> $GITHUB_ENV
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          # Build a docker container and
+          # push it to ECR so that it can
+          # be deployed to ECS.
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          echo "::set-output name=image::$ECR_REPOSITORY:$IMAGE_TAG"
+      # - name: Run Trivy vulnerability scanner
+      #   uses: aquasecurity/trivy-action@master
+      #   with:
+      #     image-ref: ${{ steps.build-image.outputs.image }}
+      #     format: 'table'
+      #     exit-code: '1'
+      #     ignore-unfixed: true
+      #     vuln-type: 'os,library'
+      #     severity: 'CRITICAL'
+      #     timeout: 20m0s
+
+  prod:
+    if: github.event.inputs.releaseType == 'prod'
+    name: Deploy to prod
+    environment:
+      name: prod
+    needs: [build]
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.build-image.outputs.image }}
+    steps:
+      - name: deploy in prod
+        run: |
+          echo "Deploying to prod"
