@@ -1,0 +1,17 @@
+name: uat build
+on:
+  push:
+    branches:
+      - uat
+
+jobs:
+  build:
+    name: uat build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Bump version and push tag
+        uses: hennejg/github-tag-action@v4.1.jh1
+        with:
+          github_token: ${{ secrets.GIT_TOKEN }}
+          tag_prefix: "v"
+          release_branches: "uat"
